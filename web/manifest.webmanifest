@@ -1,0 +1,10 @@
+{
+  "name": "Web-BlueJ",
+  "short_name": "Web-BlueJ",
+  "description": "Java lernen im Browser – Klassendiagramm, Objekt-Bench und Codepad wie in BlueJ.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3a5a8c",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

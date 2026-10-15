@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Web-BlueJ">
+  <meta name="theme-color" content="#3a5a8c">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <title>Web-BlueJ</title>
+  <link rel="stylesheet" href="vendor/codemirror/codemirror.css">
+  <link rel="stylesheet" href="vendor/codemirror/addon/dialog.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header id="menubar">
+    <div class="brand">Web-BlueJ</div>
+    <nav>
+      <button type="button" data-menu="projekt">Projekt</button>
+      <button type="button" data-menu="bearbeiten">Bearbeiten</button>
+      <button type="button" data-menu="werkzeuge">Werkzeuge</button>
+      <button type="button" data-menu="ansicht">Ansicht</button>
+      <button type="button" data-menu="hilfe">Hilfe</button>
+    </nav>
+    <button id="project-name" type="button" class="project-name" title="Projekt umbenennen"></button>
+    <span id="busy" class="busy" hidden title="Java läuft …"></span>
+  </header>
+
+  <div id="vm-status" class="vm-status" hidden>
+    <span class="spinner"></span><span id="vm-text">Lade Java-Laufzeit …</span>
+    <button id="vm-retry" type="button" class="btn small" hidden>Erneut versuchen</button>
+  </div>
+
+  <main id="workspace">
+    <aside id="toolbar">
+      <button id="btn-new-class" type="button" class="tool-btn"><span class="ico">＋</span><span>Neue Klasse …</span></button>
+      <button id="btn-editor" type="button" class="tool-btn"><span class="ico">✎</span><span>Editor</span></button>
+      <button id="btn-compile" type="button" class="tool-btn compile"><span class="ico">⚙</span><span>Übersetzen</span></button>
+      <button id="btn-codepad" type="button" class="tool-btn"><span class="ico">&gt;_</span><span>Codepad</span></button>
+      <button id="btn-terminal" type="button" class="tool-btn"><span class="ico">▤</span><span>Terminal</span></button>
+    </aside>
+
+    <section id="center">
+      <div id="stage">
+        <div id="diagram-wrap">
+          <div id="diagram"></div>
+          <div id="empty-hint" class="empty-hint" hidden>
+            <p>Dieses Projekt ist noch leer.</p>
+            <p>Tippe links auf <b>Neue Klasse …</b> oder lade über <b>Projekt → Beispielprojekt laden</b> ein Beispiel.</p>
+          </div>
+        </div>
+        <section id="editor" class="editor" hidden></section>
+      </div>
+      <section id="terminal" class="terminal" hidden>
+        <div class="panel-head"><b>Terminal</b><span class="spacer"></span>
+          <button id="term-clear" type="button" class="btn small">Leeren</button>
+          <button id="term-close" type="button" class="btn small">✕</button></div>
+        <pre id="term-out" class="term-out"></pre>
+        <form id="term-form" class="term-form"><input id="term-input" type="text" placeholder="Eingabe für System.in …" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false"><button class="btn small" type="submit">Senden</button></form>
+      </section>
+      <div id="status-bar"><span id="status">Bereit.</span></div>
+    </section>
+
+    <aside id="codepad" class="codepad">
+      <div class="panel-head"><b>Codepad</b></div>
+      <div id="cp-out" class="cp-out"></div>
+      <form id="cp-form" class="cp-form"><span class="prompt">&gt;</span><textarea id="cp-input" rows="1" placeholder="Java-Ausdruck …" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false"></textarea></form>
+    </aside>
+  </main>
+
+  <footer id="bench">
+    <div class="bench-head"><b>Objekt-Bench</b><span class="spacer"></span><button id="bench-clear" type="button" class="btn small" disabled>Leeren</button></div>
+    <div id="bench-items" class="bench-items"></div>
+    <div id="bench-hint" class="bench-hint">Rechtsklick bzw. langes Drücken auf eine übersetzte Klasse → „new …“ erzeugt ein Objekt.</div>
+  </footer>
+
+  <input id="file-picker" type="file" accept=".zip,.java,.json" multiple hidden>
+  <div id="toast" class="toast" hidden></div>
+  <div id="menu-layer"></div>
+  <div id="dialog-layer"></div>
+
+  <script src="vendor/codemirror/codemirror.js"></script>
+  <script src="vendor/codemirror/mode/clike.js"></script>
+  <script src="vendor/codemirror/addon/matchbrackets.js"></script>
+  <script src="vendor/codemirror/addon/closebrackets.js"></script>
+  <script src="vendor/codemirror/addon/searchcursor.js"></script>
+  <script src="vendor/codemirror/addon/dialog.js"></script>
+  <script src="vendor/codemirror/addon/search.js"></script>
+  <script src="vendor/codemirror/addon/jump-to-line.js"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
