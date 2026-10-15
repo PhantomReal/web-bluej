@@ -210,6 +210,63 @@ function parsePackageBluej(text) {
   return layout;
 }
 
+
+/** entries: { "pfad/Datei.java": "text", ".../package.bluej": "text" } -> neues Projekt (nur Standardpaket) */
+async function importEntries(baseName, entries) {
+  const javaPaths = Object.keys(entries).filter((p) => /\.java$/i.test(p));
+  if (!javaPaths.length) { toast('Keine .java-Dateien in „' + baseName + '“ gefunden.'); return false; }
+  const dirOf = (p) => p.split('/').slice(0, -1).join('/');
+  const common = javaPaths.map(dirOf).sort((a, b) => a.length - b.length)[0];
+  const p = emptyProject(baseName);
+  let skipped = 0;
+  for (const path of javaPaths) {
+    if (dirOf(path) !== common) { skipped++; continue; } // Unterpakete werden nicht unterstützt
+    p.files[path.split('/').pop()] = entries[path];
+  }
+  const pkgPath = Object.keys(entries).find((x) => /(^|\/)package\.bluej$/.test(x) && dirOf(x) === common);
+  if (pkgPath) p.layout = parsePackageBluej(entries[pkgPath]);
+  const existing = new Set((await store.listProjects()).map((x) => x.name));
+  let nm = p.name || 'Import', i = 2;
+  while (existing.has(nm)) nm = p.name + ' (' + i++ + ')';
+  p.name = nm;
+  await useProject(p);
+  toast(`Projekt „${p.name}“ importiert (${Object.keys(p.files).length} Klassen)` + (skipped ? `, ${skipped} Datei(en) aus Unterpaketen übersprungen.` : '.'), skipped ? 6000 : 3000);
+  return true;
+}
+
+/** Ordner (webkitdirectory) oder per Drag & Drop abgelegte Ordner: Liste von File mit relativem Pfad */
+async function importFolderFiles(files) {
+  const entries = {};
+  let root = '';
+  for (const f of files) {
+    const rel = f.webkitRelativePath || f._relPath || f.name;
+    root = root || rel.split('/')[0];
+    if (/\.java$/i.test(rel) || /(^|\/)package\.bluej$/.test(rel)) entries[rel] = await f.text();
+  }
+  await importEntries(root || 'Import', entries);
+}
+
+async function filesFromDrop(items) {
+  const out = [];
+  const walk = (entry, path) => new Promise((resolve) => {
+    if (entry.isFile) {
+      entry.file((f) => { f._relPath = path + entry.name; out.push(f); resolve(); }, resolve);
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      const all = [];
+      const read = () => reader.readEntries(async (batch) => {
+        if (!batch.length) { for (const e of all) await walk(e, path + entry.name + '/'); resolve(); } else { all.push(...batch); read(); }
+      }, resolve);
+      read();
+    } else resolve();
+  });
+  for (const it of items) {
+    const entry = it.webkitGetAsEntry && it.webkitGetAsEntry();
+    if (entry) await walk(entry, '');
+  }
+  return out;
+}
+
 async function importFiles(fileList) {
   const files = [...fileList];
   if (!files.length) return;
@@ -219,23 +276,7 @@ async function importFiles(fileList) {
   try {
     for (const z of zips) {
       const entries = await readZip(await z.arrayBuffer());
-      const javaPaths = Object.keys(entries).filter((p) => /\.java$/i.test(p));
-      if (!javaPaths.length) { toast('Keine .java-Dateien in ' + z.name); continue; }
-      const prefixes = javaPaths.map((p) => p.split('/').slice(0, -1).join('/'));
-      const common = prefixes.sort((a, b) => a.length - b.length)[0];
-      const p = emptyProject(z.name.replace(/\.zip$/i, ''));
-      for (const path of javaPaths) {
-        if (path.split('/').slice(0, -1).join('/') !== common) continue; // nur Standardpaket
-        p.files[path.split('/').pop()] = entries[path];
-      }
-      const pkgPath = Object.keys(entries).find((x) => /(^|\/)package\.bluej$/.test(x) && x.split('/').slice(0, -1).join('/') === common);
-      if (pkgPath) p.layout = parsePackageBluej(entries[pkgPath]);
-      const existing = new Set((await store.listProjects()).map((x) => x.name));
-      let nm = p.name, i = 2;
-      while (existing.has(nm)) nm = p.name + ' (' + i++ + ')';
-      p.name = nm;
-      await useProject(p);
-      toast(`Projekt „${p.name}“ importiert (${Object.keys(p.files).length} Dateien).`);
+      await importEntries(z.name.replace(/\.zip$/i, ''), entries);
     }
     for (const j of jsons) {
       const p = JSON.parse(await j.text());
@@ -787,6 +828,24 @@ function menu(label, anchor, items) {
 const filePicker = $('#file-picker');
 filePicker.addEventListener('change', async () => { await importFiles(filePicker.files); filePicker.value = ''; });
 
+const folderPicker = $('#folder-picker');
+folderPicker.addEventListener('change', async () => { await importFolderFiles(folderPicker.files); folderPicker.value = ''; });
+
+function helpImport() {
+  modal({
+    title: 'BlueJ-Projekt öffnen',
+    body: el('div', { class: 'msg' },
+      el('p', { text: 'Ein BlueJ-Projekt ist ein Ordner mit .java-Dateien und package.bluej. So kommt es hierher:' }),
+      el('ul', {},
+        el('li', { text: 'iPad: In der Dateien-App den Projektordner lange drücken → „Komprimieren“. Dann hier „BlueJ-Projekt öffnen (ZIP)“ wählen.' }),
+        el('li', { text: 'Windows/Mac: Projektordner als ZIP packen (oder in BlueJ: Projekt → Als ZIP speichern) und hier öffnen. Am Computer geht auch „Projektordner öffnen“ oder den Ordner ins Fenster ziehen.' }),
+        el('li', { text: 'Einzelne .java-Dateien lassen sich ebenfalls öffnen (mehrere gleichzeitig auswählen).' }),
+        el('li', { text: 'Zurück zu BlueJ: „Als ZIP exportieren“ – das ZIP enthält package.bluej mit den Klassenpositionen.' })),
+      el('p', { class: 'muted', text: 'Unterpakete (Unterordner mit package-Anweisung) werden noch nicht unterstützt.' })),
+    buttons: [{ label: 'OK', primary: true }],
+  });
+}
+
 const menus = {
   projekt: () => [
     { label: 'Neues Projekt …', onClick: newProject },
@@ -796,11 +855,13 @@ const menus = {
     { label: 'Projekt umbenennen …', onClick: renameProject },
     { label: 'Als ZIP exportieren (BlueJ-kompatibel)', onClick: exportZip },
     { label: 'Als Web-BlueJ-Datei sichern (.json)', onClick: exportJson },
-    { label: 'Importieren (ZIP / .java / .json) …', onClick: () => filePicker.click() },
+    { label: 'BlueJ-Projekt öffnen (ZIP) …', onClick: () => filePicker.click() },
+    { label: 'BlueJ-Projektordner öffnen …', onClick: () => folderPicker.click() },
+    { label: 'Hilfe: BlueJ-Projekt aufs iPad bringen', onClick: helpImport },
   ],
   bearbeiten: () => [
     { label: 'Neue Klasse …', onClick: newClassDialog },
-    { label: 'Klasse aus Datei hinzufügen …', onClick: () => filePicker.click() },
+    { label: '.java-Datei hinzufügen …', onClick: () => filePicker.click() },
     { sep: true },
     { label: 'Ausgewählte Klasse bearbeiten', disabled: !selected, onClick: () => openEditor(selected) },
     { label: 'Ausgewählte Klasse entfernen', disabled: !selected, onClick: () => removeClass(selected) },
@@ -893,9 +954,14 @@ document.addEventListener('keydown', (ev) => {
 
 // Dateien per Drag & Drop
 document.addEventListener('dragover', (ev) => ev.preventDefault());
-document.addEventListener('drop', (ev) => {
+document.addEventListener('drop', async (ev) => {
   ev.preventDefault();
-  if (ev.dataTransfer && ev.dataTransfer.files.length) importFiles(ev.dataTransfer.files);
+  const dt = ev.dataTransfer;
+  if (!dt) return;
+  const items = [...(dt.items || [])];
+  const hasDir = items.some((it) => it.webkitGetAsEntry && it.webkitGetAsEntry() && it.webkitGetAsEntry().isDirectory);
+  if (hasDir) { importFolderFiles(await filesFromDrop(items)); return; }
+  if (dt.files.length) importFiles(dt.files);
 });
 
 window.addEventListener('beforeunload', () => { if (project) { flushEditors(); store.saveProject(project); } });
