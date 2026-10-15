@@ -246,6 +246,59 @@ async function importFolderFiles(files) {
   await importEntries(root || 'Import', entries);
 }
 
+
+/** Import-Dialog mit sichtbaren Bedienelementen (zuverlässiger auf iPad/Safari als ein verstecktes Feld) */
+function importDialog() {
+  let dlg;
+  const done = () => dlg && dlg.close();
+  const fileInput = el('input', { type: 'file', multiple: true, class: 'file-visible' });
+  fileInput.addEventListener('change', async () => { const f = [...fileInput.files]; done(); await importFiles(f); });
+  const folderInput = el('input', { type: 'file', multiple: true, webkitdirectory: true, class: 'file-visible' });
+  folderInput.addEventListener('change', async () => { const f = [...folderInput.files]; done(); await importFolderFiles(f); });
+  const drop = el('div', { class: 'dropzone', text: 'Datei hierher ziehen (iPad: Split View mit der Dateien-App)' });
+  drop.addEventListener('dragover', (ev) => { ev.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  const text = el('textarea', { class: 'paste mono', rows: 6, placeholder: 'public class Hund\n{\n    …\n}', autocapitalize: 'off', autocomplete: 'off', autocorrect: 'off', spellcheck: 'false' });
+  const err = el('div', { class: 'field-error' });
+  const addText = el('button', {
+    class: 'btn', type: 'button', text: 'Als Klasse hinzufügen', onclick: () => {
+      const src = text.value;
+      const m = /\b(?:class|interface|enum|record)\s+([A-Za-z_]\w*)/.exec(src);
+      if (!m) { err.textContent = 'Kein Klassenname gefunden (class …).'; return; }
+      if (project.files[fileOf(m[1])] && !confirm('Klasse ' + m[1] + ' existiert schon. Ersetzen?')) return;
+      project.files[fileOf(m[1])] = src.endsWith('\n') ? src : src + '\n';
+      compiled.delete(m[1]);
+      if (editor.docs.has(m[1])) editor.reload(m[1]);
+      refreshDiagram();
+      scheduleSave();
+      done();
+      toast('Klasse ' + m[1] + ' hinzugefügt.');
+    },
+  });
+  const body = el('div', { class: 'import-dlg' },
+    el('div', { class: 'imp-sec' }, el('b', { text: '1. BlueJ-Projekt (ZIP) oder .java-Dateien' }), el('small', { class: 'muted', text: 'Auf „Datei auswählen“ tippen und in der Dateien-App wählen.' }), fileInput),
+    el('div', { class: 'imp-sec' }, el('b', { text: '2. Per Drag & Drop' }), drop),
+    el('div', { class: 'imp-sec' }, el('b', { text: '3. Quelltext einfügen' }), el('small', { class: 'muted', text: 'Code kopieren (z. B. aus Mail, Notizen, Dateien-Vorschau) und hier einfügen.' }), text, err, addText),
+    el('div', { class: 'imp-sec' }, el('b', { text: '4. Projektordner (nur Computer)' }), folderInput),
+    el('p', { class: 'muted small', text: 'Tipp fürs iPad: Projektordner in der Dateien-App lange drücken → „Komprimieren“ ergibt eine ZIP-Datei.' }));
+  dlg = modal({ title: 'BlueJ-Projekt / Dateien importieren', body, className: 'wide', buttons: [{ label: 'Schließen', cancel: true }] });
+  drop.addEventListener('drop', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    drop.classList.remove('over');
+    done();
+    handleDrop(ev.dataTransfer);
+  });
+}
+
+async function handleDrop(dt) {
+  if (!dt) return;
+  const items = [...(dt.items || [])];
+  const hasDir = items.some((it) => it.webkitGetAsEntry && it.webkitGetAsEntry() && it.webkitGetAsEntry().isDirectory);
+  if (hasDir) { importFolderFiles(await filesFromDrop(items)); return; }
+  if (dt.files.length) importFiles(dt.files);
+}
+
 async function filesFromDrop(items) {
   const out = [];
   const walk = (entry, path) => new Promise((resolve) => {
@@ -855,13 +908,12 @@ const menus = {
     { label: 'Projekt umbenennen …', onClick: renameProject },
     { label: 'Als ZIP exportieren (BlueJ-kompatibel)', onClick: exportZip },
     { label: 'Als Web-BlueJ-Datei sichern (.json)', onClick: exportJson },
-    { label: 'BlueJ-Projekt öffnen (ZIP) …', onClick: () => filePicker.click() },
-    { label: 'BlueJ-Projektordner öffnen …', onClick: () => folderPicker.click() },
+    { label: 'BlueJ-Projekt öffnen / importieren …', onClick: importDialog },
     { label: 'Hilfe: BlueJ-Projekt aufs iPad bringen', onClick: helpImport },
   ],
   bearbeiten: () => [
     { label: 'Neue Klasse …', onClick: newClassDialog },
-    { label: '.java-Datei hinzufügen …', onClick: () => filePicker.click() },
+    { label: '.java-Datei hinzufügen / Code einfügen …', onClick: importDialog },
     { sep: true },
     { label: 'Ausgewählte Klasse bearbeiten', disabled: !selected, onClick: () => openEditor(selected) },
     { label: 'Ausgewählte Klasse entfernen', disabled: !selected, onClick: () => removeClass(selected) },
@@ -954,14 +1006,9 @@ document.addEventListener('keydown', (ev) => {
 
 // Dateien per Drag & Drop
 document.addEventListener('dragover', (ev) => ev.preventDefault());
-document.addEventListener('drop', async (ev) => {
+document.addEventListener('drop', (ev) => {
   ev.preventDefault();
-  const dt = ev.dataTransfer;
-  if (!dt) return;
-  const items = [...(dt.items || [])];
-  const hasDir = items.some((it) => it.webkitGetAsEntry && it.webkitGetAsEntry() && it.webkitGetAsEntry().isDirectory);
-  if (hasDir) { importFolderFiles(await filesFromDrop(items)); return; }
-  if (dt.files.length) importFiles(dt.files);
+  handleDrop(ev.dataTransfer);
 });
 
 window.addEventListener('beforeunload', () => { if (project) { flushEditors(); store.saveProject(project); } });

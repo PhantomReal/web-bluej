@@ -218,3 +218,12 @@ body.codepad-open .codepad { width: 300px; border-left: 2px solid var(--border);
   .brand { display: none; }
   #toolbar { width: 70px; } .tool-btn { font-size: 11px; min-height: 56px; }
 }
+
+/* Import-Dialog */
+.import-dlg .imp-sec { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.import-dlg .imp-sec:last-of-type { border-bottom: 0; }
+.file-visible { font-size: 16px; padding: 10px; border: 1px dashed var(--accent); border-radius: 10px; background: var(--panel); width: 100%; }
+.file-visible::file-selector-button { font: inherit; background: var(--accent); color: var(--accent-fg); border: 0; border-radius: 8px; padding: 10px 16px; margin-right: 12px; cursor: pointer; }
+.dropzone { border: 2px dashed var(--border); border-radius: 10px; padding: 18px; text-align: center; color: var(--muted); }
+.dropzone.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.paste { width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--bg); font-size: 14px; resize: vertical; }
