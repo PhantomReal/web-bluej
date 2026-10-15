@@ -7,6 +7,7 @@ import { analyze, classTemplate, isValidClassName, renameInSource } from './pars
 import * as store from './store.js';
 import { writeZip, readZip } from './zip.js';
 import { SAMPLE } from './samples.js';
+import { TOPICS, CATEGORIES } from './lexikon.js';
 
 const $ = (s) => document.querySelector(s);
 const vm = new JavaVM();
@@ -444,6 +445,7 @@ const editor = new EditorPanel($('#editor'), {
   onCompile: () => compileAll(),
   onHide: () => hideEditor(),
   onActive: () => {},
+  onHelp: (word) => openLexikon(null, word),
 });
 
 function flushEditors() {
@@ -777,6 +779,7 @@ let termVisible = false;
 function showTerminal(v) {
   termVisible = v;
   $('#terminal').hidden = !v;
+  $('#split-term').hidden = !v;
   $('#btn-terminal').classList.toggle('active', v);
   if (v) setTimeout(() => $('#term-input').focus({ preventScroll: true }), 50);
 }
@@ -871,6 +874,122 @@ function showCodepad(v) {
   if (v) setTimeout(() => $('#cp-input').focus({ preventScroll: true }), 50);
 }
 
+
+// ------------------------------------------------------------------ Java-Lexikon
+
+function findTopic(word) {
+  const w = (word || '').trim().toLowerCase();
+  if (!w) return null;
+  return TOPICS.find((t) => t.keywords.some((k) => k.toLowerCase() === w)) || TOPICS.find((t) => t.title.toLowerCase().includes(w)) || null;
+}
+
+function highlighted(code) {
+  const pre = el('pre', { class: 'lex-code mono cm-s-default' });
+  if (window.CodeMirror && CodeMirror.runMode) CodeMirror.runMode(code, 'text/x-java', pre);
+  else pre.textContent = code;
+  return pre;
+}
+
+let lexDialog = null;
+function openLexikon(topicId, query) {
+  if (lexDialog) { lexDialog.close(); lexDialog = null; }
+  let current = topicId || (findTopic(query) || {}).id || TOPICS[0].id;
+  const search = el('input', { type: 'search', placeholder: 'Suchen: if, for, Array, ArrayList …', value: findTopic(query) ? '' : (query || ''), autocapitalize: 'off', autocomplete: 'off', autocorrect: 'off', spellcheck: 'false' });
+  const list = el('div', { class: 'lex-list' });
+  const detail = el('div', { class: 'lex-detail' });
+  const body = el('div', { class: 'lex' }, el('div', { class: 'lex-side' }, search, list), detail);
+
+  const matches = (t, q) => !q || (t.title + ' ' + t.keywords.join(' ') + ' ' + t.text.join(' ')).toLowerCase().includes(q);
+  const renderList = () => {
+    const q = search.value.trim().toLowerCase();
+    list.replaceChildren();
+    let n = 0;
+    for (const cat of CATEGORIES) {
+      const items = TOPICS.filter((t) => t.cat === cat && matches(t, q));
+      if (!items.length) continue;
+      list.append(el('div', { class: 'lex-cat', text: cat }));
+      for (const t of items) {
+        n++;
+        list.append(el('button', { type: 'button', class: 'lex-item' + (t.id === current ? ' active' : ''), text: t.title, onclick: () => { current = t.id; renderList(); renderDetail(true); } }));
+      }
+    }
+    if (!n) list.append(el('div', { class: 'muted small', text: 'Nichts gefunden.' }));
+  };
+  const renderDetail = (scroll) => {
+    const t = TOPICS.find((x) => x.id === current) || TOPICS[0];
+    detail.replaceChildren(el('h3', { text: t.title }), ...t.text.map((p) => el('p', { text: p })));
+    detail.append(el('div', { class: 'lex-label', text: 'Beispiel' }), highlighted(t.code));
+    const actions = el('div', { class: 'lex-actions' },
+      el('button', { class: 'btn small', type: 'button', text: 'Kopieren', onclick: async (ev) => {
+        try { await navigator.clipboard.writeText(t.code); ev.target.textContent = 'Kopiert ✓'; } catch (e) { toast('Kopieren nicht möglich.'); }
+      } }));
+    if (editor.active && !$('#editor').hidden) {
+      actions.append(el('button', { class: 'btn small', type: 'button', text: 'In Editor einfügen', onclick: () => { editor.insertText(t.code + '\n'); lexDialog && lexDialog.close(); } }));
+    }
+    if (t.run) {
+      actions.append(el('button', { class: 'btn small primary', type: 'button', text: '▶ Im Codepad ausführen', onclick: () => { lexDialog && lexDialog.close(); showCodepad(true); codepadRun(t.run); } }));
+    }
+    detail.append(actions);
+    if (t.tips && t.tips.length) {
+      detail.append(el('div', { class: 'lex-label', text: 'Gut zu wissen' }), el('ul', { class: 'lex-tips' }, t.tips.map((x) => el('li', { text: x }))));
+    }
+    if (scroll) detail.scrollTop = 0;
+  };
+  search.addEventListener('input', () => {
+    renderList();
+    const first = list.querySelector('.lex-item');
+    if (first && !list.querySelector('.lex-item.active')) first.click();
+  });
+  renderList();
+  renderDetail();
+  lexDialog = modal({ title: 'Java-Lexikon', body, className: 'wide lex-modal', buttons: [{ label: 'Schließen', primary: true }], onClose: () => { lexDialog = null; } });
+  setTimeout(() => { const a = list.querySelector('.lex-item.active'); if (a) a.scrollIntoView({ block: 'nearest' }); }, 40);
+}
+
+// -------------------------------------------------- Größe der Fenster ändern
+
+function setupSplitter(handle, { axis, target, cssVar, min, max, sign, def, key }) {
+  const root = document.documentElement;
+  const saved = store.getPref(key, null);
+  if (saved) root.style.setProperty(cssVar, saved + 'px');
+  let drag = null;
+  handle.addEventListener('pointerdown', (ev) => {
+    ev.preventDefault();
+    handle.setPointerCapture(ev.pointerId);
+    const r = target().getBoundingClientRect();
+    drag = { start: axis === 'x' ? ev.clientX : ev.clientY, size: axis === 'x' ? r.width : r.height };
+    handle.classList.add('dragging');
+    document.body.classList.add('resizing');
+  });
+  handle.addEventListener('pointermove', (ev) => {
+    if (!drag) return;
+    const pos = axis === 'x' ? ev.clientX : ev.clientY;
+    const size = Math.round(Math.max(min, Math.min(max(), drag.size + sign * (pos - drag.start))));
+    root.style.setProperty(cssVar, size + 'px');
+    drag.last = size;
+    editor.refresh();
+    diagram.drawArrows();
+  });
+  const end = () => {
+    if (!drag) return;
+    if (drag.last) store.setPref(key, drag.last);
+    drag = null;
+    handle.classList.remove('dragging');
+    document.body.classList.remove('resizing');
+    editor.refresh();
+  };
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', end);
+  handle.addEventListener('dblclick', () => { root.style.removeProperty(cssVar); store.setPref(key, null); editor.refresh(); });
+}
+
+const vw = () => document.documentElement.clientWidth;
+const vh = () => document.documentElement.clientHeight;
+setupSplitter($('#split-editor'), { axis: 'x', target: () => $('#editor'), cssVar: '--editor-w', min: 280, max: () => $('#stage').clientWidth - 160, sign: -1, key: 'w-editor' });
+setupSplitter($('#split-term'), { axis: 'y', target: () => $('#terminal'), cssVar: '--term-h', min: 80, max: () => vh() - 260, sign: -1, key: 'h-term' });
+setupSplitter($('#split-bench'), { axis: 'y', target: () => $('#bench'), cssVar: '--bench-h', min: 60, max: () => vh() - 260, sign: -1, key: 'h-bench' });
+setupSplitter($('#split-cp'), { axis: 'x', target: () => $('#codepad'), cssVar: '--cp-w', min: 200, max: () => vw() - 360, sign: -1, key: 'w-cp' });
+
 // ----------------------------------------------------------------- Menüleiste
 
 function menu(label, anchor, items) {
@@ -931,6 +1050,7 @@ const menus = {
     { label: 'Editor-Schrift kleiner', onClick: () => editor.setFont(editor.fontSize - 1) },
   ],
   hilfe: () => [
+    { label: 'Java-Lexikon (if, for, Arrays …)', onClick: () => openLexikon() },
     { label: 'Über Web-BlueJ', onClick: about },
     { label: 'Bedienung auf dem iPad', onClick: helpTouch },
   ],
@@ -981,6 +1101,8 @@ function helpTouch() {
         el('li', { text: 'Klasse lange drücken (oder Rechtsklick) = Menü: Objekt erzeugen, statische Methoden, Bearbeiten …' }),
         el('li', { text: 'Klassen lassen sich mit dem Finger verschieben.' }),
         el('li', { text: 'Rotes Objekt auf der Bench antippen = Methoden aufrufen, Inspizieren, Entfernen.' }),
+        el('li', { text: 'Trennlinien zwischen den Fenstern ziehen = Editor, Terminal, Codepad und Bench größer/kleiner (Doppeltippen = zurücksetzen).' }),
+        el('li', { text: 'Im Editor auf „?“ tippen: erklärt das Wort am Cursor (z. B. for, if, ArrayList).' }),
         el('li', { text: 'Codepad: Java-Ausdrücke direkt auswerten, z. B. „person1.getAge() * 2“.' }),
         el('li', { text: 'Tipp: Seite zum Home-Bildschirm hinzufügen (Teilen → „Zum Home-Bildschirm“) für Vollbild.' }))),
     buttons: [{ label: 'OK', primary: true }],
@@ -991,6 +1113,7 @@ $('#btn-new-class').addEventListener('click', newClassDialog);
 $('#btn-compile').addEventListener('click', compileAll);
 $('#btn-codepad').addEventListener('click', () => showCodepad(!document.body.classList.contains('codepad-open')));
 $('#btn-terminal').addEventListener('click', () => showTerminal(!termVisible));
+$('#btn-lexikon').addEventListener('click', () => openLexikon());
 $('#bench-clear').addEventListener('click', clearBench);
 $('#btn-editor').addEventListener('click', () => {
   if (selected) openEditor(selected);

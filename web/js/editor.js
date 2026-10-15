@@ -21,6 +21,7 @@ export class EditorPanel {
       btn('↶', 'Rückgängig', () => this.cm.undo()),
       btn('↷', 'Wiederholen', () => this.cm.redo()),
       btn('Suchen', 'Suchen (Strg+F)', () => this.cm.execCommand('findPersistent')),
+      btn('?', 'Erklärung zum Wort am Cursor (Java-Lexikon)', () => this.hooks.onHelp(this.wordAtCursor()), 'help'),
       btn('A−', 'Schrift kleiner', () => this.setFont(this.fontSize - 1)),
       btn('A+', 'Schrift größer', () => this.setFont(this.fontSize + 1)),
       el('span', { class: 'spacer' }),
@@ -60,6 +61,17 @@ export class EditorPanel {
       this.hooks.onEdit(name);
       timer = setTimeout(() => this.hooks.setSource(name, this.docs.get(name).getValue()), 400);
     });
+  }
+
+  wordAtCursor() {
+    if (this.cm.somethingSelected()) return this.cm.getSelection().trim();
+    const w = this.cm.findWordAt(this.cm.getCursor());
+    return this.cm.getRange(w.anchor, w.head).trim();
+  }
+
+  insertText(text) {
+    this.cm.replaceSelection(text, 'end');
+    this.cm.focus();
   }
 
   setFont(px) {

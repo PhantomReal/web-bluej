@@ -14,6 +14,9 @@ Eine im Browser laufende Nachbildung der Bedienung von [BlueJ](https://bluej.org
 - **Terminal** für `System.out`, `System.err` und `System.in`
 - **Projekte** lokal im Browser gespeichert; **ZIP-Export/-Import im BlueJ-Format** (`package.bluej` mit Klassenpositionen) – Projekte lassen sich zwischen iPad und Desktop-BlueJ austauschen
 - Standard-Klassenvorlage wie in BlueJ (deutsch)
+- **Java-Lexikon** (if/else, Schleifen, Arrays, ArrayList, Klassen, Vererbung …) mit Beispielen, die sich im Codepad ausführen oder in den Editor einfügen lassen; im Editor erklärt „?“ das Wort am Cursor
+- **Fenstergrößen** per Trennlinie änderbar (Editor, Terminal, Codepad, Bench); Doppeltippen setzt zurück
+- Import per ZIP, Ordner, Drag & Drop oder eingefügtem Quelltext
 
 Nicht enthalten: Debugger (Haltepunkte), JUnit-Tests, Pakete, Swing/JavaFX-Fenster.
 

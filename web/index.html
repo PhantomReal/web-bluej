@@ -41,6 +41,7 @@
       <button id="btn-compile" type="button" class="tool-btn compile"><span class="ico">⚙</span><span>Übersetzen</span></button>
       <button id="btn-codepad" type="button" class="tool-btn"><span class="ico">&gt;_</span><span>Codepad</span></button>
       <button id="btn-terminal" type="button" class="tool-btn"><span class="ico">▤</span><span>Terminal</span></button>
+      <button id="btn-lexikon" type="button" class="tool-btn"><span class="ico">?</span><span>Java-Lexikon</span></button>
     </aside>
 
     <section id="center">
@@ -52,8 +53,10 @@
             <p>Tippe links auf <b>Neue Klasse …</b> oder lade über <b>Projekt → Beispielprojekt laden</b> ein Beispiel.</p>
           </div>
         </div>
+        <div id="split-editor" class="splitter v" title="Ziehen: Editor-Breite ändern"></div>
         <section id="editor" class="editor" hidden></section>
       </div>
+      <div id="split-term" class="splitter h" hidden title="Ziehen: Terminal-Höhe ändern"></div>
       <section id="terminal" class="terminal" hidden>
         <div class="panel-head"><b>Terminal</b><span class="spacer"></span>
           <button id="term-clear" type="button" class="btn small">Leeren</button>
@@ -64,6 +67,7 @@
       <div id="status-bar"><span id="status">Bereit.</span></div>
     </section>
 
+    <div id="split-cp" class="splitter v" title="Ziehen: Codepad-Breite ändern"></div>
     <aside id="codepad" class="codepad">
       <div class="panel-head"><b>Codepad</b></div>
       <div id="cp-out" class="cp-out"></div>
@@ -71,6 +75,7 @@
     </aside>
   </main>
 
+  <div id="split-bench" class="splitter h" title="Ziehen: Höhe der Objekt-Bench ändern"></div>
   <footer id="bench">
     <div class="bench-head"><b>Objekt-Bench</b><span class="spacer"></span><button id="bench-clear" type="button" class="btn small" disabled>Leeren</button></div>
     <div id="bench-items" class="bench-items"></div>
@@ -85,6 +90,7 @@
 
   <script src="vendor/codemirror/codemirror.js"></script>
   <script src="vendor/codemirror/mode/clike.js"></script>
+  <script src="vendor/codemirror/addon/runmode.js"></script>
   <script src="vendor/codemirror/addon/matchbrackets.js"></script>
   <script src="vendor/codemirror/addon/closebrackets.js"></script>
   <script src="vendor/codemirror/addon/searchcursor.js"></script>
